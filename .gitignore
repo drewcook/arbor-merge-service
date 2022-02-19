@@ -2,3 +2,5 @@
 downloads/
 .venv
 *cache*
+*.wav
+*.log

@@ -1,13 +1,15 @@
 [tool.poetry]
-name = "audio-testing"
+name = "audio-lib"
 version = "0.1.0"
 description = ""
 authors = ["noahdahlman <noah.dahlman@outlook.com>"]
 
+[tool.poetry.scripts]
+start = "uvicorn server.main:app"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 pydub = "^0.25.1"
-ipfshttpclient = "^0.7.0"
 autopep8 = "^1.6.0"
 python-dotenv = "^0.19.2"
 wget = "^3.2"
