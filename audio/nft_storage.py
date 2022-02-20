@@ -1,7 +1,5 @@
-from multiprocessing.sharedctypes import Value
-from typing import Dict, Any, List, Type
+from typing import Dict, Any, List, Optional
 import requests
-import json
 import wget
 import os
 import time
@@ -31,15 +29,22 @@ class NFTStorage:
     def delete(self, cid: str) -> bool:
         return self.api(f"/{cid}", "delete")['ok']
 
-    def download(self, cid: str):
+    def download(self, cid: str, out: Optional[str] = None):
         fname = "tmp.wav"
         try:
             if not isinstance(cid, str):
                 raise TypeError(f"{cid}")
             wget.download(f"https://ipfs.io/ipfs/{cid}", out=fname)
+            cid = cid.replace('/', '-')
             while fname not in os.listdir():
                 time.sleep(.1)
-            os.rename(fname, f"{os.getcwd()}/downloads/{cid}.wav")
+            if out:
+                os.rename(fname, f"downloads/{out}")
+            else:
+                raise Exception("out parameter required to write file...")
+            # else:
+            #     os.rename(
+            #         fname, f"{os.getcwd()}/downloads/{cid}{'.wav' if 'wav' not in cid else ''}")
         finally:
             for f in os.listdir():
                 if f == fname:
