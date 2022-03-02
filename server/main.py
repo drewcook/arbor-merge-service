@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -9,10 +10,10 @@ from audio.nft_storage import NFTStorage
 from dotenv import load_dotenv
 from pydub import AudioSegment
 load_dotenv()
-
+import random
 
 stream_handler = logging.StreamHandler()
-stream_handler.setLevel(logging.INFO)
+stream_handler.setLevel(logging.DEBUG)
 
 logging.basicConfig(level=logging.DEBUG,
                     format='%(asctime)s %(levelname)s %(module)s %(funcName)s %(message)s',
@@ -37,23 +38,37 @@ async def merge(samples: SampleList):
     '''
         Downloads a list of samples and merges them, uploads the merge to ipfs, and returns the CID of the IPFS upload
     '''
-
+    loop = asyncio.get_running_loop()
     cids: List[str] = samples.sample_cids
     fnames: Dict[str, Any] = {}
     try:
         nfts: NFTStorage = NFTStorage(os.getenv("NFT_STORAGE_API"))
+        tasks = []
         for cid in cids:
-            fnames[cid] = "tmp_" + str(int(time.time())) + ".wav"
-            nfts.download(cid, fnames[cid])
+            n_fname = None
+            while True:
+                n_fname = "tmp_" + str(int(random.random() * 100000)) + ".wav"
+                if n_fname in fnames.values():
+                    continue
+                else: break
+            if isinstance(n_fname, str):
+                fnames[cid] = n_fname
+            else:
+                raise Exception("Failed to find file name")
+            tasks.append(loop.run_in_executor(None, nfts.download, cid, fnames[cid]))
+        await asyncio.gather(*tasks)
+        _logger.debug(f"Downloads finished for {','.join(cids)}")
         audio_segments: Dict[str, Any] = {}
+        tasks = []
         for cid in cids:
             audio_segments[cid] = AudioSegment.from_file(DOWNLOAD_PATH +
                                                          fnames[cid], format="wav")
-
-        temp_file = f"tmp_{time.time()}_output.wav"
+        _logger.debug("Audio segments built...")
+        temp_file = f"tmp_{random.random() * 1000}_output.wav"
         merge_audio(list(audio_segments.values()), temp_file)
+        _logger.debug("Merge done.")
         with open(temp_file, "r") as f:
-            cid = nfts.upload(f.buffer)
+            cid = await loop.run_in_executor(None, nfts.upload, f.buffer)
             _logger.info(f"Merge result: {cid}")
         os.remove(temp_file)
         return {"success": True, "cid": cid}
