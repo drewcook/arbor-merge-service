@@ -1,3 +1,4 @@
+import random
 import asyncio
 import logging
 from fastapi import FastAPI
@@ -10,7 +11,6 @@ from audio.nft_storage import NFTStorage
 from dotenv import load_dotenv
 from pydub import AudioSegment
 load_dotenv()
-import random
 
 stream_handler = logging.StreamHandler()
 stream_handler.setLevel(logging.DEBUG)
@@ -40,6 +40,8 @@ async def merge(samples: SampleList):
     '''
     loop = asyncio.get_running_loop()
     cids: List[str] = samples.sample_cids
+    if len(cids) < 2:
+        return {"success": False, "error": "Number of cids must be greater than 1."}
     fnames: Dict[str, Any] = {}
     try:
         nfts: NFTStorage = NFTStorage(os.getenv("NFT_STORAGE_API"))
@@ -50,12 +52,14 @@ async def merge(samples: SampleList):
                 n_fname = "tmp_" + str(int(random.random() * 100000)) + ".wav"
                 if n_fname in fnames.values():
                     continue
-                else: break
+                else:
+                    break
             if isinstance(n_fname, str):
                 fnames[cid] = n_fname
             else:
                 raise Exception("Failed to find file name")
-            tasks.append(loop.run_in_executor(None, nfts.download, cid, fnames[cid]))
+            tasks.append(loop.run_in_executor(
+                None, nfts.download, cid, fnames[cid]))
         await asyncio.gather(*tasks)
         _logger.debug(f"Downloads finished for {','.join(cids)}")
         audio_segments: Dict[str, Any] = {}
@@ -74,7 +78,7 @@ async def merge(samples: SampleList):
         return {"success": True, "cid": cid}
     except Exception as e:
         _logger.error(f"Failed to merge audio samples... {e}")
-        return {'success': False}
+        return {'success': False, 'error': "Unhandled exception..."}
     finally:
         for d in os.listdir(DOWNLOAD_PATH):
             if d in fnames.values():
