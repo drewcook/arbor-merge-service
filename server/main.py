@@ -1,12 +1,17 @@
+from csv import excel_tab
+from io import BytesIO
 import random
 import asyncio
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+
+
 from pydantic import BaseModel
 from typing import List, Dict, Any
 import os
 import time
-from audio.audio import merge_audio
+from audio.audio import merge_audio, merge_audio_bytes
 from audio.nft_storage import NFTStorage
 from dotenv import load_dotenv
 from pydub import AudioSegment
@@ -25,16 +30,27 @@ _logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class SampleList(BaseModel):
     sample_cids: List[str]
 
+class Samples(BaseModel):
+    samples: List[bytes]
 
 DOWNLOAD_PATH = "downloads/"
 
 
-@app.post("/merge")
-async def merge(samples: SampleList):
+@app.post("/merge_old")
+async def merge_old(samples: SampleList):
     '''
         Downloads a list of samples and merges them, uploads the merge to ipfs, and returns the CID of the IPFS upload
     '''
@@ -83,3 +99,15 @@ async def merge(samples: SampleList):
         for d in os.listdir(DOWNLOAD_PATH):
             if d in fnames.values():
                 os.remove(f"{DOWNLOAD_PATH}{d}")
+
+
+@app.post("/merge")
+async def merge(files: List[UploadFile]):
+    try:
+        
+        samples = [AudioSegment.from_file(BytesIO(await file.read())) for file in files]
+        merged_bytes = merge_audio_bytes(samples)
+        return Response(content = merged_bytes.getvalue(), media_type='audio/wav')
+    except Exception as e:
+        print("Merge error:")
+        print(e)
