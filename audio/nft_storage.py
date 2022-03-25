@@ -30,7 +30,10 @@ class NFTStorage:
         return self.api(f"/{cid}", "delete")['ok']
 
     def download(self, cid: str, out: Optional[str] = None):
-        fname = "tmp.wav"
+        if out is None:
+            fname = "tmp.wav"
+        else:
+            fname = out
         try:
             if not isinstance(cid, str):
                 raise TypeError(f"{cid}")
